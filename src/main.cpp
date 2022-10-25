@@ -71,7 +71,7 @@ void setup() {
   
   if( xBinarySemaphore != NULL ){
 
-		xTaskCreatePinnedToCore( vHandlerTask, "Handler", 1000, NULL, 1, NULL, 0); //Criar HandlerTask no Core
+		xTaskCreatePinnedToCore( vHandlerTask, "Handler", 1000, NULL, 2, NULL, 0); //Criar HandlerTask no Core
 	}
 }
 
@@ -193,12 +193,20 @@ void mainTask(void *pvParameters){
       display.print("Khong can tuoi nuoc");
       display.display();
 
-      digitalWrite(RELAY_PIN,HIGH);
+      digitalWrite(RELAY_PIN,LOW);
     }else{
       Serial.println(F("Dat bi kho!!"));
+      display.setTextSize(1);
+      display.setCursor(10,16);
+      display.print("!! Dat bi kho !!!");
+      display.setTextSize(1);
+      display.setCursor(6,48);
+      display.print("Dang tuoi nuoc...");
+      display.display();
+      digitalWrite(RELAY_PIN,HIGH);
     }
     xSemaphoreGive(xBinarySemaphore);
-    vTaskDelay(6200/ portTICK_PERIOD_MS); // 3 chu ki do sensor se hien thi 1 lan
+    vTaskDelay(3100/ portTICK_PERIOD_MS); // 3 chu ki do sensor se hien thi 1 lan
   }
 }
 
