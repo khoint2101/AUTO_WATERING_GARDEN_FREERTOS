@@ -13,6 +13,8 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 #include "logo"
+#include "humi"
+#include "temp"
 
 /*Dinh nghia cac chan */
 #define DHTPIN 19
@@ -47,8 +49,8 @@ SemaphoreHandle_t xMutex;
 
 
 void readSensor(void * pvParameters);
-void taskTuoinuoc(void * pvParameters);
-void TaskHienthi(void * pvParameters);
+//void taskTuoinuoc(void * pvParameters);
+void mainTask(void * pvParameters);
 static void vHandlerTask( void *pvParameters );
 
 
@@ -56,6 +58,7 @@ void setup() {
   // put your setup code here, to run once:
   Serial.begin(115200);
   pinMode(RELAY_PIN,OUTPUT);
+  digitalWrite(RELAY_PIN,LOW); // test
   xQueueTemp = xQueueCreate(2, sizeof(float));
   xQueueHumidity = xQueueCreate(2, sizeof(float));
   //----------------------
@@ -63,8 +66,8 @@ void setup() {
 	xMutex = xSemaphoreCreateMutex();
   //----------
   xTaskCreatePinnedToCore(readSensor,"ReadSensor", 10000, NULL, 3,NULL, ARDUINO_RUNNING_CORE);
-  xTaskCreatePinnedToCore(taskTuoinuoc,"Tuoinuoc", 10000, NULL, 2,NULL, ARDUINO_RUNNING_CORE);
-  xTaskCreatePinnedToCore(TaskHienthi,"Hienthi", 10000, NULL, 2, NULL, ARDUINO_RUNNING_CORE);
+  //xTaskCreatePinnedToCore(taskTuoinuoc,"Tuoinuoc", 10000, NULL, 2,NULL, ARDUINO_RUNNING_CORE);
+  xTaskCreatePinnedToCore(mainTask,"MainTask", 10000, NULL, 2, NULL, ARDUINO_RUNNING_CORE);
   
   if( xBinarySemaphore != NULL ){
 
@@ -81,7 +84,7 @@ static void vHandlerTask( void * pvParameters ){
     xSemaphoreTake(xBinarySemaphore,portMAX_DELAY);
     Serial.println("Tao lay Semaphore");
     xSemaphoreGive(xBinarySemaphore);
-    vTaskDelay(4000/portTICK_PERIOD_MS);
+    vTaskDelay(1000/portTICK_PERIOD_MS);
   }
 }
 
@@ -103,8 +106,8 @@ void readSensor(void * pvParameters){
 		for(;;);
 	}
 	vTaskDelay(1000 / portTICK_PERIOD_MS);       //Ocupar processador durante 1000ms
-	display.clearDisplay();                      //Limpar Display
-  display.drawBitmap(0, 0, actvn_big_icon,128, 64,WHITE);
+	display.clearDisplay();                      
+  display.drawBitmap(0, 0, actvn_big_icon,128, 64,WHITE); //velogo nha truong
   display.display();
 	
   for(;;){
@@ -122,13 +125,13 @@ void readSensor(void * pvParameters){
      }
     display.clearDisplay();
     display.setTextColor(WHITE);	
-		//Lê Temperatura corretamente
+		
 		// display temperature
 		display.setTextSize(1);						//Selecionar tamanho do texto
 		display.setCursor(0,0);						//Selecionar onde imprime o texto no display
-		display.print("Temperature: ");
+		display.drawBitmap(10,0,temp,40,40,WHITE);
 		display.setTextSize(1);					//Selecionar tamanho do texto
-		display.setCursor(0,10);					//Selecionar onde imprime o texto no display
+		display.setCursor(10,52);					//Selecionar onde imprime o texto no display
 		display.print(t);		//Mostrar Temperatura no display
 		display.print(" ");
 		display.setTextSize(1);
@@ -136,6 +139,18 @@ void readSensor(void * pvParameters){
 		display.write(167);
 		display.setTextSize(1.5);
 		display.print("C");
+
+    // display humidity
+		display.setTextSize(1);						//Selecionar tamanho do texto
+		display.setCursor(64,0);						//Selecionar onde imprime o texto no display
+		display.drawBitmap(74,0,humi,40,40,WHITE);
+		display.setTextSize(1);					//Selecionar tamanho do texto
+		display.setCursor(74,52);					//Selecionar onde imprime o texto no display
+		display.print(h);		//Mostrar Temperatura no display
+		display.print(" ");
+		display.setTextSize(1);                  
+		display.setTextSize(1.5);
+		display.print("\%");
 
     xSemaphoreGive(xMutex);
     xQueueSendToBack(xQueueTemp,&t,0);
@@ -147,6 +162,7 @@ void readSensor(void * pvParameters){
     Serial.println(h);
 
     display.display();
+    display.clearDisplay();
     vTaskDelayUntil(&xLastWakeTime, 1000/ portTICK_PERIOD_MS);
 
   }
@@ -154,11 +170,13 @@ void readSensor(void * pvParameters){
 }
 
 
-void TaskHienthi(void *pvParameters){
+void mainTask(void *pvParameters){
   (void) pvParameters;
+
+    xSemaphoreTake(xBinarySemaphore, portMAX_DELAY);
    float Buff;
-  //  display.clearDisplay();
-  //  display.drawBitmap(0,0,actvn_big_icon,128,64,WHITE);
+   display.clearDisplay();
+   display.setTextColor(WHITE);
   for(;;){
     xQueueReceive(xQueueHumidity,&Buff,portMAX_DELAY);
     
@@ -167,20 +185,22 @@ void TaskHienthi(void *pvParameters){
     Serial.println(Buff);
     if (Buff >=50){
       Serial.println(F("Do am binh thuong"));
+      display.setTextSize(1);
+      display.setCursor(10,16);
+      display.print("Do am binh thuong!");
+      display.setTextSize(1);
+      display.setCursor(6,48);
+      display.print("Khong can tuoi nuoc");
+      display.display();
+
       digitalWrite(RELAY_PIN,HIGH);
     }else{
       Serial.println(F("Dat bi kho!!"));
     }
-    vTaskDelay(1000);
+    xSemaphoreGive(xBinarySemaphore);
+    vTaskDelay(6200/ portTICK_PERIOD_MS); // 3 chu ki do sensor se hien thi 1 lan
   }
 }
 
-void taskTuoinuoc(void *pvParameters){
-        (void) pvParameters;
-  for(;;){
-    Serial.println(F("Dang tuoi nuoc"));
-    // digitalWrite(RELAY_PIN,LOW);
-    vTaskDelay(1000);
-  }
-}
+
 
